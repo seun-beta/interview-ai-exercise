@@ -1,13 +1,22 @@
-"""Tests for `api/main.py`."""
-from fastapi.testclient import TestClient
-from src.main import app
+"""Tests for `ai_exercise/main.py`."""
 
-client = TestClient(app)
+import httpx
+import pytest
 
-def test_health_check_route() -> None:
-    response = client.get("/health")
-    assert response.status_code == 200
+from ai_exercise.main import app
 
-def test_chat_route() -> None:
-    response = client.post("/chat", json={"query": "What is the capital of France?"})
-    assert response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_health_check_route() -> None:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/health")
+        assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_chat_route() -> None:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/chat", json={"query": "What is the capital of France?"})
+        assert response.status_code == 200

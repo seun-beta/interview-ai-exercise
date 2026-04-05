@@ -25,3 +25,6 @@ __pycache__/
 
 # chroma db
 .chroma_db/
+
+# eval results
+ai_exercise/evals/results/

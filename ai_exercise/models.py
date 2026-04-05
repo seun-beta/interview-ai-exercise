@@ -1,16 +1,6 @@
 """Types for the API."""
 
-from dataclasses import dataclass
-
 from pydantic import BaseModel
-
-
-@dataclass
-class Document:
-    """A document to be added to the vector store."""
-
-    page_content: str
-    metadata: dict = None
 
 
 class HealthRouteOutput(BaseModel):
@@ -31,7 +21,15 @@ class ChatQuery(BaseModel):
     query: str
 
 
+class TokenUsage(BaseModel):
+    """Token usage for a single LLM call."""
+
+    prompt: int
+    completion: int
+
+
 class ChatOutput(BaseModel):
     """Model for the chat route output."""
 
     message: str
+    token_usage: dict[str, TokenUsage] | None = None

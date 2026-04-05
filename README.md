@@ -1,87 +1,129 @@
-# AI Exercise - Retrieval
+# StackOne RAG System
 
-> simple RAG example
+A RAG system that answers questions about StackOne's 7 unified API specs (HRIS, ATS, LMS, IAM, CRM, Marketing, and the StackOne platform API).
 
-## Project requirements
+## Setup
 
-### uv
+### Requirements
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) to install and manage python dependencies.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management
+- [Docker](https://docs.docker.com/engine/install/) (optional, for containerized runs)
+- An OpenAI API key
 
-### Docker Engine (optional)
-
-Install [Docker Engine](https://docs.docker.com/engine/install/) to build and run the API's Docker image locally.
-
-## Installation
+### Install
 
 ```bash
 make install
 ```
 
-## API
+### Configure
 
-The project includes an API built with [FastAPI](https://fastapi.tiangolo.com/). Its code can be found at `src/api`.
+Copy `.env_example` to `.env` and fill in your values:
 
-The API is containerized using a [Docker](https://docs.docker.com/get-started/) image, built from the `Dockerfile` and `docker-compose.yml` at the root. This is optional, you can also run the API without docker.
+```
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o
+EMBEDDINGS_MODEL=text-embedding-3-small
+COLLECTION_NAME=documents
+CHUNK_SIZE=4000
+K_NEIGHBORS=5
+DEBUG_MODE=false
+```
 
-### Environment Variables
+Set `DEBUG_MODE=true` to include token usage in `/chat` responses.
 
-Copy .env_example to .env and fill in the values.
+## Running
 
-### Build and start the API
-
-To build and start the API, use the following Makefile command:
+### Start the server
 
 ```bash
 make dev-api
 ```
 
-you can also use `make start-api` to start the API using Docker.
+Or with Docker: `make start-api`
 
-## Frontend
+### Load documents
 
-The project includes a frontend built with [Streamlit](https://streamlit.io/). Its code can be found at `demo`.
+Once the server is running, load the 7 API specs into the vector store:
 
-Run the frontend with:
+```bash
+curl http://localhost:80/load
+```
+
+### Chat
+
+```bash
+curl -X POST http://localhost:80/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How do you authenticate to the StackOne API?"}'
+```
+
+### Streamlit frontend
 
 ```bash
 make start-app
 ```
 
-## Testing
+## Evaluation
 
-To run unit tests, run `pytest` with:
+The eval system has two parts: a generation eval (judges the final answer) and a retrieval eval (checks if the right chunks were retrieved).
 
-```bash
-make test
-```
+### Generation eval
 
-## Formatting and static analysis
-
-There is some preset up formatting and static analysis tools to help you write clean code. check the make file for more details.
+Sends each question to the running server, then uses 3 separate LLM judges (correctness, completeness, faithfulness) to score each answer against predefined ground truth. Results are saved as timestamped CSVs in `ai_exercise/evals/results/`.
 
 ```bash
-make lint
+make eval
 ```
+
+Requires the server to be running with documents loaded.
+
+### Retrieval eval
+
+Calls the retrieval functions directly (no server needed, but documents must be loaded in `.chroma_db`). Checks if the expected endpoint chunk appears in the top-k results for each question.
 
 ```bash
-make format
+make eval-retrieval
 ```
+
+### Test dataset
+
+20 hand-written test cases in `ai_exercise/evals/dataset.jsonl` across 10 categories: auth, params, field_detail, negative, cross_api, ambiguous, nested, create, specific_api, error.
+
+## Testing and code quality
 
 ```bash
-make typecheck
+make test        # pytest
+make lint        # ruff
+make format      # ruff --fix
+make typecheck   # mypy
 ```
 
-# Get Started
+## Project structure
 
-Have a look in `ai_exercise/constants.py`. Then check out the server routes in `ai_exercise/main.py`. 
+```
+ai_exercise/
+  main.py                  # FastAPI routes: /health, /load, /chat
+  constants.py             # Settings, OpenAI + Chroma clients
+  models.py                # Pydantic models
+  loading/
+    openapi_chunker.py     # Converts OpenAPI specs to natural language chunks
+    document_loader.py     # Fetches specs, chunks, splits, stores
+  retrieval/
+    retrieval.py           # Query rewriting + vector search
+    vector_store.py        # Chroma collection setup
+  llm/
+    completions.py         # LLM generation
+    embeddings.py          # OpenAI embedding function
+    prompt.py              # RAG prompt + query rewrite prompt
+  evals/
+    run_eval.py            # Generation eval with LLM judges
+    run_retrieval_eval.py  # Retrieval accuracy eval
+    prompt.py              # Judge prompts (correctness, completeness, faithfulness)
+    dataset.jsonl          # 20 test cases with ground truth
+    results/               # Timestamped CSV outputs
+```
 
-1. Load some documents by calling the `/load` endpoint. Does the system work as intended? Are there any issues?
+## Documentation
 
-2. Find some method of evaluating the quality of the retrieval system.
-
-3. See how you can improve the retrieval system. Some ideas:
-- Play with the chunking logic
-- Try different embeddings models
-- Other types of models which may be relevant
-- How else could you store the data for better retrieval?
+- [IMPROVEMENTS.md](IMPROVEMENTS.md) -- what I'd improve with more time
